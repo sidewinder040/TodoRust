@@ -3,6 +3,10 @@
     {
       "title": "Go Shopping",
       "description": "Buy some milk and have a coffee and a piece of cake."
+    },
+    {
+      "title": "Learn some more Rustlang",
+      "description": "Understand what Co-Pilot has done with my code."
     }
   ]
 }
