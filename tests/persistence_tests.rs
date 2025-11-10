@@ -4,7 +4,7 @@ use todo::{TodoItem, TodoList};
 
 #[test]
 fn save_and_load_roundtrip() {
-    let mut tmp = NamedTempFile::new().expect("create temp file");
+    let tmp = NamedTempFile::new().expect("create temp file");
     let path = tmp.path().to_owned();
 
     let mut list = TodoList::default();
