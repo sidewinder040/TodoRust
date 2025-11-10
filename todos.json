@@ -7,6 +7,14 @@
     {
       "title": "Learn some more Rustlang",
       "description": "Understand what Co-Pilot has done with my code."
+    },
+    {
+      "title": "Use MySQL?",
+      "description": "Store items in a database??"
+    },
+    {
+      "title": "Output Prettify",
+      "description": "Make the output look better. Colour/Formatting"
     }
   ]
 }
