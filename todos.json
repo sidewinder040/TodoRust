@@ -15,6 +15,10 @@
     {
       "title": "Output Prettify",
       "description": "Make the output look better. Colour/Formatting"
+    },
+    {
+      "title": "New Test",
+      "description": "Looking at the new formatting."
     }
   ]
 }

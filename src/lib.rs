@@ -2,6 +2,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use owo_colors::OwoColorize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TodoItem {
@@ -18,9 +19,14 @@ impl TodoItem {
         }
     }
 
-    /// Return a formatted representation used by `display`.
+    /// Return a formatted (colored) representation used by `display`.
     pub fn format(&self) -> String {
-        format!("Title: {}\nDescription: {}", self.title, self.description)
+        // Color the title prominently and dim the description for readability.
+        format!(
+            "Title: {}\nDescription: {}",
+            self.title.bold().bright_white(),
+            self.description.dimmed()
+        )
     }
 }
 
@@ -68,12 +74,22 @@ mod tests {
         let t = TodoItem::new("Buy milk", "2 liters");
         assert_eq!(t.title, "Buy milk");
         assert_eq!(t.description, "2 liters");
-        assert_eq!(t.format(), "Title: Buy milk\nDescription: 2 liters");
+        let expected = format!(
+            "Title: {}\nDescription: {}",
+            "Buy milk".bold().bright_white(),
+            "2 liters".dimmed()
+        );
+        assert_eq!(t.format(), expected);
     }
 
     #[test]
     fn test_format_empty_lib() {
         let t = TodoItem::new("", "");
-        assert_eq!(t.format(), "Title: \nDescription: ");
+        let expected = format!(
+            "Title: {}\nDescription: {}",
+            "".bold().bright_white(),
+            "".dimmed()
+        );
+        assert_eq!(t.format(), expected);
     }
 }

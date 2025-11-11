@@ -1,6 +1,8 @@
 use todo::{TodoItem, TodoList};
 
 use std::env;
+use std::io::{self, Write};
+use owo_colors::OwoColorize;
 
 fn choose_todo_file() -> String {
     // Priority: first CLI arg, then TODO_FILE env var, then default
@@ -19,33 +21,28 @@ fn main() {
     // Load existing todos from disk (if any)
     let mut list = TodoList::load(&todo_file);
 
-    println!("Loaded {} todos from {}.", list.items.len(), todo_file);
+    print_banner(&todo_file, list.items.len());
 
     loop {
-        println!("\nCommands: (l)ist, (a)dd, (r)emove, (e)dit, (q)uit");
-        print!("> ");
-        use std::io::{self, Write};
-        io::stdout().flush().ok();
+        print_commands();
 
-        let mut cmd = String::new();
-        if io::stdin().read_line(&mut cmd).is_err() {
-            println!("Failed to read input");
-            continue;
-        }
+        let cmd = prompt_input("Command");
         match cmd.trim().to_lowercase().as_str() {
             "l" | "list" => {
+                print_separator();
                 if list.items.is_empty() {
-                    println!("No todos.");
+                    println!("{}", "No todos.".italic().dimmed());
                 } else {
                     for (i, t) in list.items.iter().enumerate() {
-                        println!("{}: {}", i + 1, t.format());
+                        println!("{:>3}. {}", i + 1, t.format().bright_white());
                     }
                 }
+                print_separator();
             }
             "a" | "add" => {
                 let item = create_validated();
                 list.add(item);
-                println!("Added.");
+                println!("{}", "Added.".green().bold());
             }
             "r" | "remove" => {
                 if list.items.is_empty() {
@@ -53,13 +50,13 @@ fn main() {
                     continue;
                 }
                 println!("Enter index to remove (1-{}):", list.items.len());
-                let idx = read_index();
-                if let Some(i) = idx {
+                if let Some(i) = read_index() {
                     if i == 0 || i > list.items.len() {
-                        println!("Index out of range");
+                        println!("{}", "Index out of range".red());
                     } else {
+                        println!("{} {}", "Removing:".yellow(), list.items[i - 1].format().bright_white());
                         list.items.remove(i - 1);
-                        println!("Removed.");
+                        println!("{}", "Removed.".green().bold());
                     }
                 }
             }
@@ -71,20 +68,20 @@ fn main() {
                 println!("Enter index to edit (1-{}):", list.items.len());
                 if let Some(i) = read_index() {
                     if i == 0 || i > list.items.len() {
-                        println!("Index out of range");
+                        println!("{}", "Index out of range".red());
                     } else {
                         let idx = i - 1;
-                        println!("Editing todo {}: {}", i, list.items[idx].format());
+                        println!("{} {}", "Editing todo".yellow(), format!("{}: {}", i, list.items[idx].format()).bright_white());
                         let new = create_validated();
                         list.items[idx] = new;
-                        println!("Updated.");
+                        println!("{}", "Updated.".green().bold());
                     }
                 }
             }
             "q" | "quit" => {
                 match list.save(&todo_file) {
-                    Ok(()) => println!("Saved {} todos to {}", list.items.len(), todo_file),
-                    Err(e) => println!("Failed to save todos: {}", e),
+                    Ok(()) => println!("{}", format!("Saved {} todos to {}", list.items.len(), todo_file).green()),
+                    Err(e) => println!("{}", format!("Failed to save todos: {}", e).red()),
                 }
                 break;
             }
@@ -94,45 +91,60 @@ fn main() {
     }
 }
 
-fn read_index() -> Option<usize> {
-    use std::io::{self, Write};
-    print!("> ");
+fn print_banner(todo_file: &str, count: usize) {
+    print_separator();
+    let title = format!(" TodoRust — {} todos (file: {}) ", count, todo_file);
+    println!("{}", title.bold().bright_blue());
+    print_separator();
+}
+
+fn print_separator() {
+    println!("{}", "-".repeat(50).dimmed());
+}
+
+fn print_commands() {
+    println!("{}", "Commands:".bold().underline());
+    println!("  {} - {}", format!("{:<8}", "l, list").cyan(), "List todos".dimmed());
+    println!("  {} - {}", format!("{:<8}", "a, add").cyan(), "Add a todo".dimmed());
+    println!("  {} - {}", format!("{:<8}", "r, remove").cyan(), "Remove by index".dimmed());
+    println!("  {} - {}", format!("{:<8}", "e, edit").cyan(), "Edit by index".dimmed());
+    println!("  {} - {}", format!("{:<8}", "q, quit").cyan(), "Save and quit".dimmed());
+}
+
+fn prompt_input(prompt: &str) -> String {
+    print!("{}: ", prompt.cyan().bold());
     io::stdout().flush().ok();
     let mut s = String::new();
     if io::stdin().read_line(&mut s).is_err() {
-        println!("Failed to read index");
+        println!("{}", "Failed to read input".red());
+        return String::new();
+    }
+    s.trim().to_string()
+}
+
+fn read_index() -> Option<usize> {
+    let s = prompt_input(">");
+    if s.is_empty() {
+        println!("{}", "No input provided".yellow());
         return None;
     }
     match s.trim().parse::<usize>() {
         Ok(n) => Some(n),
         Err(_) => {
-            println!("Invalid number");
+            println!("{}", "Invalid number".red());
             None
         }
     }
 }
 
 fn create_validated() -> TodoItem {
-    use std::io::{self, Write};
-
     loop {
-        let mut title = String::new();
-        let mut description = String::new();
-
-        print!("Title (required): ");
-        io::stdout().flush().expect("Failed to flush stdout");
-        io::stdin().read_line(&mut title).expect("Failed to read title");
-        let title = title.trim().to_string();
+        let title = prompt_input("Title (required)");
         if title.is_empty() {
-            println!("Title cannot be empty. Please try again.");
+            println!("{}", "Title cannot be empty. Please try again.".red());
             continue;
         }
-
-        print!("Description: ");
-        io::stdout().flush().expect("Failed to flush stdout");
-        io::stdin().read_line(&mut description).expect("Failed to read description");
-        let description = description.trim().to_string();
-
+        let description = prompt_input("Description");
         return TodoItem::new(&title, &description);
     }
 }
