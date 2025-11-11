@@ -41,6 +41,32 @@ cargo run -- mytodos.json
 TODO_FILE=mytodos.json cargo run
 ```
 
+Color behavior
+----------------
+
+The interactive UI uses colored output for improved readability (headers, prompts, success/warning/error messages, and per-item formatting).
+
+- Default: colors are enabled when stdout is a TTY (interactive terminal).
+- You can explicitly disable colors with `--no-color` or explicitly enable them with `--color`.
+  These flags can be passed anywhere in the CLI args (for example `cargo run -- --no-color`).
+- When colors are disabled the application sets the `NO_COLOR` environment variable so library code and downstream tools can detect the preference.
+
+Examples:
+
+```bash
+# run with default (TTY detection)
+cargo run
+
+# force no colors
+cargo run -- --no-color
+
+# force colors even if stdout is not a TTY
+cargo run -- --color
+```
+
+Note: when piping or redirecting output (for example `cargo run > out.txt`) colors will be disabled automatically.
+
+
 When you quit the application (`q` or `quit`) the current todos are saved to the chosen JSON file.
 
 ## Example session
@@ -69,6 +95,8 @@ Tests included:
 - `src/main.rs` — interactive CLI that uses the library.
 - `tests/persistence_tests.rs` — integration test for persistence.
 - `Cargo.toml` — declares dependencies (`serde`, `serde_json`) and dev-dependency `tempfile`.
+  - `owo-colors` — used to colorize interactive output.
+  - `atty` — used to detect whether stdout is a TTY; used to automatically disable colors when output is redirected.
 
 ## Next steps / suggestions
 

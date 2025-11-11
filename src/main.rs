@@ -3,11 +3,14 @@ use todo::{TodoItem, TodoList};
 use std::env;
 use std::io::{self, Write};
 use owo_colors::OwoColorize;
+use atty::Stream;
 
 fn choose_todo_file() -> String {
-    // Priority: first CLI arg, then TODO_FILE env var, then default
-    if let Some(arg1) = env::args().nth(1) {
-        return arg1;
+    // Priority: first non-flag CLI arg, then TODO_FILE env var, then default
+    for a in env::args().skip(1) {
+        if !a.starts_with('-') {
+            return a;
+        }
     }
     if let Ok(envp) = env::var("TODO_FILE") {
         return envp;
@@ -16,6 +19,23 @@ fn choose_todo_file() -> String {
 }
 
 fn main() {
+    // Determine color policy: default = TTY-detection. Allow CLI override with
+    // `--no-color` or `--color`. We set the NO_COLOR env var when colors are
+    // disabled so library code can respect the setting.
+    let mut colors = atty::is(Stream::Stdout);
+    for a in env::args().skip(1) {
+        if a == "--no-color" {
+            colors = false;
+        } else if a == "--color" {
+            colors = true;
+        }
+    }
+    if colors {
+        env::remove_var("NO_COLOR");
+    } else {
+        env::set_var("NO_COLOR", "1");
+    }
+
     let todo_file = choose_todo_file();
 
     // Load existing todos from disk (if any)
