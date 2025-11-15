@@ -1,24 +1,27 @@
 {
   "items": [
     {
-      "title": "Go Shopping",
-      "description": "Buy some milk and have a coffee and a piece of cake."
+      "id": "7a322168-a4ee-4766-9906-eddae5ce5055",
+      "title": "Test Todo",
+      "description": "Added more properties to TodoItem Struct",
+      "status": "Pending",
+      "priority": "Low",
+      "created_at": 1762978352,
+      "updated_at": 1762978444,
+      "tags": []
     },
     {
-      "title": "Learn some more Rustlang",
-      "description": "Understand what Co-Pilot has done with my code."
-    },
-    {
-      "title": "Use MySQL?",
-      "description": "Store items in a database??"
-    },
-    {
-      "title": "Output Prettify",
-      "description": "Make the output look better. Colour/Formatting"
-    },
-    {
-      "title": "New Test",
-      "description": "Looking at the new formatting."
+      "id": "3aa467b0-3b78-4405-af6f-6a1129fb543b",
+      "title": "Another Task",
+      "description": "blah blah blah",
+      "status": "Pending",
+      "priority": "High",
+      "created_at": 1763232125,
+      "updated_at": 1763232701,
+      "tags": [
+        "testing",
+        "editing"
+      ]
     }
   ]
 }

@@ -55,12 +55,52 @@ fn main() {
                 } else {
                     for (i, t) in list.items.iter().enumerate() {
                         println!("{:>3}. {}", i + 1, t.format().bright_white());
+                        if let Some(ref desc) = t.description {
+                            if !desc.is_empty() {
+                                // Indent description and dim it for readability
+                                println!("      {}", desc.dimmed());
+                            }
+                        }
                     }
                 }
                 print_separator();
             }
             "a" | "add" => {
-                let item = create_validated();
+                // Gather base item
+                let mut item = create_validated(None);
+
+                // Priority
+                let pri = prompt_input("Priority (low/med/high) [blank for none]");
+                if !pri.is_empty() {
+                    let p = match pri.to_lowercase().as_str() {
+                        "low" => Some(todo::Priority::Low),
+                        "high" => Some(todo::Priority::High),
+                        _ => Some(todo::Priority::Medium),
+                    };
+                    item.priority = p;
+                }
+
+                // Due date (YYYY-MM-DD)
+                let due = prompt_input("Due date (YYYY-MM-DD) [blank for none]");
+                if !due.is_empty() {
+                    if let Ok(nd) = chrono::NaiveDate::parse_from_str(&due, "%Y-%m-%d") {
+                        if let Some(naive) = nd.and_hms_opt(0, 0, 0) {
+                            let dt = chrono::DateTime::from_naive_utc_and_offset(naive, chrono::Utc);
+                            item.due_date = Some(dt);
+                        } else {
+                            println!("{}", "Invalid date/time; ignoring due date".yellow());
+                        }
+                    } else {
+                        println!("{}", "Invalid date format; ignoring due date".yellow());
+                    }
+                }
+
+                // Tags (comma separated)
+                let tags = prompt_input("Tags (comma separated) [blank for none]");
+                if !tags.is_empty() {
+                    item.tags = tags.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+                }
+
                 list.add(item);
                 println!("{}", "Added.".green().bold());
             }
@@ -92,7 +132,20 @@ fn main() {
                     } else {
                         let idx = i - 1;
                         println!("{} {}", "Editing todo".yellow(), format!("{}: {}", i, list.items[idx].format()).bright_white());
-                        let new = create_validated();
+                        let old = list.items[idx].clone();
+                        let mut new = create_validated(Some(&old));
+                        // preserve identity and timestamps
+                        new.id = old.id.clone();
+                        new.created_at = old.created_at;
+                        new.updated_at = Some(chrono::Utc::now());
+                        // carry over optional fields when left blank
+                        if new.priority.is_none() {
+                            new.priority = old.priority.clone();
+                        }
+                        if new.tags.is_empty() {
+                            new.tags = old.tags.clone();
+                        }
+
                         list.items[idx] = new;
                         println!("{}", "Updated.".green().bold());
                     }
@@ -156,16 +209,112 @@ fn read_index() -> Option<usize> {
         }
     }
 }
-
-fn create_validated() -> TodoItem {
-    loop {
-        let title = prompt_input("Title (required)");
-        if title.is_empty() {
-            println!("{}", "Title cannot be empty. Please try again.".red());
-            continue;
+fn prompt_default(prompt: &str, default: Option<&str>) -> String {
+    match default {
+        Some(d) if !d.is_empty() => {
+            print!("{} [{}]: ", prompt.cyan().bold(), d.dimmed());
         }
-        let description = prompt_input("Description");
-        return TodoItem::new(&title, &description);
+        _ => {
+            print!("{}: ", prompt.cyan().bold());
+        }
+    }
+    io::stdout().flush().ok();
+    let mut s = String::new();
+    if io::stdin().read_line(&mut s).is_err() {
+        println!("{}", "Failed to read input".red());
+        return String::new();
+    }
+    let s = s.trim().to_string();
+    s
+}
+
+fn create_validated(existing: Option<&TodoItem>) -> TodoItem {
+    // Title (required) - on edit, pressing enter keeps the existing title
+    let title = loop {
+        let def = existing.map(|e| e.title.as_str());
+        let input = prompt_default("Title (required)", def);
+        if !input.is_empty() {
+            break input;
+        }
+        if let Some(e) = existing {
+            if !e.title.is_empty() {
+                break e.title.clone();
+            }
+        }
+        println!("{}", "Title cannot be empty. Please try again.".red());
+    };
+
+    // Description (optional)
+    let def_desc = existing.and_then(|e| e.description.as_deref());
+    let desc_in = prompt_default("Description", def_desc);
+    let description = if desc_in.is_empty() {
+        def_desc.map(|s| s.to_string())
+    } else {
+        Some(desc_in)
+    };
+
+    // Priority
+    let def_pri = existing.and_then(|e| e.priority.as_ref()).map(|p| match p {
+        todo::Priority::Low => "low",
+        todo::Priority::Medium => "med",
+        todo::Priority::High => "high",
+    });
+    let pri_in = prompt_default("Priority (low/med/high) [blank for none]", def_pri);
+    let priority = if pri_in.is_empty() {
+        existing.and_then(|e| e.priority.clone())
+    } else {
+        match pri_in.to_lowercase().as_str() {
+            "low" => Some(todo::Priority::Low),
+            "high" => Some(todo::Priority::High),
+            _ => Some(todo::Priority::Medium),
+        }
+    };
+
+    // Due date
+    let def_due = existing.and_then(|e| e.due_date.as_ref()).map(|d| d.format("%Y-%m-%d").to_string());
+    let due_in = prompt_default("Due date (YYYY-MM-DD) [blank for none]", def_due.as_deref());
+    let due_date = if due_in.is_empty() {
+        existing.and_then(|e| e.due_date.clone())
+    } else {
+        match chrono::NaiveDate::parse_from_str(&due_in, "%Y-%m-%d") {
+            Ok(nd) => nd.and_hms_opt(0, 0, 0).map(|naive| chrono::DateTime::from_naive_utc_and_offset(naive, chrono::Utc)),
+            Err(_) => {
+                println!("{}", "Invalid date format; ignoring due date".yellow());
+                existing.and_then(|e| e.due_date.clone())
+            }
+        }
+    };
+
+    // Tags
+    let def_tags = if let Some(e) = existing { if !e.tags.is_empty() { Some(e.tags.join(",")) } else { None } } else { None };
+    let tags_in = prompt_default("Tags (comma separated) [blank for none]", def_tags.as_deref());
+    let tags = if tags_in.is_empty() {
+        existing.map(|e| e.tags.clone()).unwrap_or_default()
+    } else {
+        tags_in.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()
+    };
+
+    // Build the TodoItem, carrying over id/created_at/metadata when editing
+    if let Some(e) = existing {
+        TodoItem {
+            id: e.id.clone(),
+            title,
+            description,
+            status: e.status.clone(),
+            priority,
+            created_at: e.created_at,
+            updated_at: Some(chrono::Utc::now()),
+            due_date,
+            tags,
+            metadata: e.metadata.clone(),
+        }
+    } else {
+        // Use the public constructor to ensure fields like id/created_at are set
+        let mut item = TodoItem::new(&title, description.as_deref().unwrap_or(""));
+        item.priority = priority;
+        item.due_date = due_date;
+        item.tags = tags;
+        item
     }
 }
 
