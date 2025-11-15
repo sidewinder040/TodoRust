@@ -19,7 +19,31 @@ fn save_and_load_roundtrip() {
     assert!(contents.contains("T1"));
 
     // Load using API
-    let loaded = TodoList::load(&path);
+    let loaded = TodoList::load(&path).expect("load should succeed");
     assert_eq!(loaded.items.len(), 2);
     assert_eq!(loaded.items[0].title, "T1");
+}
+
+#[test]
+fn load_nonexistent_file_returns_error() {
+    let result = TodoList::load("/nonexistent/path/todos.json");
+    assert!(result.is_err());
+}
+
+#[test]
+fn load_invalid_json_returns_error() {
+    let tmp = NamedTempFile::new().expect("create temp file");
+    let path = tmp.path().to_owned();
+    
+    // Write invalid JSON
+    fs::write(&path, "{ invalid json").expect("write invalid json");
+    
+    let result = TodoList::load(&path);
+    assert!(result.is_err());
+}
+
+#[test]
+fn load_or_empty_returns_empty_list_on_error() {
+    let list = TodoList::load_or_empty("/nonexistent/path/todos.json");
+    assert_eq!(list.items.len(), 0);
 }

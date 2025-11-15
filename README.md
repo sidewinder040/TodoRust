@@ -2,21 +2,45 @@
 
 Lightweight command-line Todo application written in Rust. It stores a list of todos in memory while running and persists them to a JSON file when the application exits.
 
-## Progress (what's implemented)
+## Features
 
-- Core data type `TodoItem` with a constructor and formatter.
-- `TodoList` that holds a `Vec<TodoItem>` and provides `load(path)`, `save(path)`, and `add(item)` helpers.
-- Persistence to JSON using `serde` + `serde_json`.
-- Interactive command-line UI in `src/main.rs` with the following commands:
-  - `list` / `l` — show saved todos
-  - `add` / `a` — add a new todo (title is required)
-  - `remove` / `r` — remove by 1-based index
-  - `edit` / `e` — edit an existing todo by index
-  - `quit` / `q` — save and exit
-- Choose the todo JSON file via CLI argument or `TODO_FILE` environment variable (falls back to `todos.json`).
-- Unit and integration tests added:
-  - Library unit tests for `TodoItem` formatting.
-  - Integration test `tests/persistence_tests.rs` that checks `TodoList::save/load` using a temporary file (`tempfile` crate).
+- **Rich TodoItem Data Model**: Each todo includes:
+  - `id` — Unique identifier (UUID v4)
+  - `title` — Required title
+  - `description` — Optional description (displayed in list view, indented and dimmed)
+  - `status` — Pending, InProgress, or Completed (with color-coded output)
+  - `priority` — Low, Medium, or High (optional)
+  - `created_at` — Creation timestamp
+  - `updated_at` — Last modification timestamp (optional)
+  - `due_date` — Optional due date (YYYY-MM-DD format)
+  - `tags` — Comma-separated tags for organization
+  - `metadata` — Extensible key-value store for custom data
+
+- **Full-Featured CLI** with color-coded output and intuitive prompts:
+  - `list` / `l` — Show all todos with descriptions and metadata
+  - `add` / `a` — Add a new todo with all optional fields
+  - `edit` / `e` — Edit existing todos (preserves ID and creation timestamp)
+  - `remove` / `r` — Remove todos by index
+  - `quit` / `q` — Save and exit
+
+- **Flexible Persistence**:
+  - JSON format with pretty printing
+  - Load/save helpers with error handling
+  - Choose file via CLI argument or `TODO_FILE` environment variable (defaults to `todos.json`)
+
+- **Color-Coded Output**:
+  - Status badges with distinct colors (Pending: yellow, InProgress: cyan, Completed: green)
+  - Priority indicators with colors
+  - TTY-aware auto-detection (disable with `--no-color`, enable with `--color`)
+  - Clear visual hierarchy with headers, separators, and dimmed secondary text
+
+- **Comprehensive Test Suite** (15+ tests):
+  - Unit tests for `TodoItem` and `Status`/`Priority` enums
+  - Serialization/deserialization tests
+  - Format output verification
+  - `TodoList` add and persistence tests
+  - Default value validation
+  - Persistence roundtrip tests using temporary files
 
 ## Requirements
 
@@ -71,11 +95,49 @@ When you quit the application (`q` or `quit`) the current todos are saved to the
 
 ## Example session
 
-- Start the program: `cargo run`
-- Add a todo: `a` then provide the Title and Description (Title cannot be empty)
-- List todos: `l`
-- Edit or remove using the `e` and `r` commands with 1-based indices
-- Quit: `q` (saves to JSON file)
+Here's a typical workflow:
+
+```
+$ cargo run
+
+--------------------------------------------------
+ TodoRust — 0 todos (file: todos.json) 
+--------------------------------------------------
+Commands:
+  l, list  - List todos
+  a, add   - Add a todo
+  r, remove - Remove by index
+  e, edit   - Edit by index
+  q, quit  - Save and quit
+
+Command: a
+Title (required): Buy groceries
+Description: Milk, bread, eggs
+Priority (low/med/high) [blank for none]: med
+Due date (YYYY-MM-DD) [blank for none]: 2025-12-25
+Tags (comma separated) [blank for none]: shopping,urgent
+Added.
+
+Command: l
+--------------------------------------------------
+  1. Buy groceries [Medium] [2025-12-25] #shopping #urgent
+      Milk, bread, eggs
+--------------------------------------------------
+
+Command: e
+Enter index to edit (1-1):
+> 1
+Editing todo 1: Buy groceries [Medium] [2025-12-25] #shopping #urgent
+Title (required) [Buy groceries]: 
+Description [Milk, bread, eggs]: 
+Priority (low/med/high) [med]: high
+Due date (YYYY-MM-DD) [2025-12-25]: 
+Tags (comma separated) [shopping,urgent]: 
+Updated.
+
+Command: q
+Saved 1 todos to todos.json
+```
 
 ## Running tests
 
@@ -85,23 +147,63 @@ Run the full test suite with:
 cargo test
 ```
 
-Tests included:
-- Library unit tests for `TodoItem` behavior.
-- `tests/persistence_tests.rs` verifies save/load roundtrip using a temporary file.
+**Test Coverage** (15+ tests):
+- **Unit tests** in `src/lib.rs`:
+  - `TodoItem` creation and formatting
+  - `Status` and `Priority` enum variants
+  - Default field values
+
+- **Integration tests** in `tests/todo_tests.rs`:
+  - TodoItem field validation (all new fields)
+  - Serialization/deserialization roundtrip
+  - Format output verification
+  - `TodoList` add and retrieval
+  - Default value verification
+
+- **Persistence tests** in `tests/persistence_tests.rs`:
+  - Full save/load roundtrip with temporary files
+  - JSON format validation
+
+All tests pass with no warnings or errors.
 
 ## Files of interest
 
-- `src/lib.rs` — library: `TodoItem`, `TodoList`, persistence helpers.
-- `src/main.rs` — interactive CLI that uses the library.
-- `tests/persistence_tests.rs` — integration test for persistence.
-- `Cargo.toml` — declares dependencies (`serde`, `serde_json`) and dev-dependency `tempfile`.
-  - `owo-colors` — used to colorize interactive output.
-  - `atty` — used to detect whether stdout is a TTY; used to automatically disable colors when output is redirected.
+- `src/lib.rs` — Core library types:
+  - `TodoItem` struct with all fields (id, status, priority, timestamps, tags, metadata)
+  - `Status` enum (Pending, InProgress, Completed)
+  - `Priority` enum (Low, Medium, High)
+  - `TodoList` with load/save/add helpers
+  - JSON serialization with serde
+  
+- `src/main.rs` — Interactive CLI:
+  - Command loop for add, list, edit, remove, quit
+  - Color-coded output with `owo-colors`
+  - TTY detection with `atty`
+  - Input prompts with defaults for editing
+  - File selection via CLI args or `TODO_FILE` env var
 
-## Next steps / suggestions
+- `tests/todo_tests.rs` — Integration test suite (12+ tests)
+  
+- `tests/persistence_tests.rs` — Persistence roundtrip test
 
-- Add more thorough CLI tests (spawn the binary and feed input) if you want full end-to-end automation.
-- Add backup/atomic save (write to a temp file then rename) to make saves safer.
-- Add search/filter, priorities, timestamps, or IDs for more complex workflows.
+- `Cargo.toml` — Dependency manifest:
+  - `serde` + `serde_json` for JSON serialization
+  - `chrono` for timestamp handling with serde support
+  - `uuid` for unique identifiers
+  - `owo-colors` for terminal styling
+  - `atty` for TTY detection
+  - `tempfile` (dev-dependency) for test support
 
-If you'd like, I can implement any of the above improvements next.
+## Next steps / Future improvements
+
+The application is feature-complete for basic todo management. Potential enhancements include:
+
+- **Search/Filter**: Add commands to search by title, tag, or priority
+- **Sorting**: Sort todos by priority, due date, or status
+- **Archiving**: Archive completed todos instead of deleting
+- **Backup**: Implement atomic saves (write to temp, then rename)
+- **Data validation**: Add constraints (e.g., max title length, valid dates)
+- **Config file**: Support `.todorust.toml` for custom settings
+- **Shell integration**: Bash/PowerShell completion scripts
+- **Sync**: Optional cloud sync for multiple machines
+- **Import/Export**: CSV or other format support

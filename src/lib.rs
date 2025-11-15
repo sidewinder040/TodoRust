@@ -6,6 +6,37 @@ use std::path::Path;
 use owo_colors::OwoColorize;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+use std::fmt;
+
+/// Custom error type for TodoList operations
+#[derive(Debug)]
+pub enum TodoListError {
+    IoError(std::io::Error),
+    ParseError(serde_json::Error),
+}
+
+impl fmt::Display for TodoListError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TodoListError::IoError(e) => write!(f, "IO error: {}", e),
+            TodoListError::ParseError(e) => write!(f, "JSON parse error: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for TodoListError {}
+
+impl From<std::io::Error> for TodoListError {
+    fn from(e: std::io::Error) -> Self {
+        TodoListError::IoError(e)
+    }
+}
+
+impl From<serde_json::Error> for TodoListError {
+    fn from(e: serde_json::Error) -> Self {
+        TodoListError::ParseError(e)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Status {
@@ -130,16 +161,28 @@ pub struct TodoList {
 }
 
 impl TodoList {
-    /// Load a TodoList from the given file path. If the file does not exist or
-    /// cannot be parsed, returns an empty list.
-    pub fn load<P: AsRef<Path>>(path: P) -> Self {
+    /// Load a TodoList from the given file path.
+    /// Returns `Ok(TodoList)` on success, or `Err(TodoListError)` if the file cannot be read
+    /// or the JSON cannot be parsed.
+    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, TodoListError> {
         let path = path.as_ref();
-        match fs::read_to_string(path) {
-            Ok(contents) => match serde_json::from_str::<TodoList>(&contents) {
-                Ok(list) => list,
-                Err(_) => TodoList::default(),
-            },
-            Err(_) => TodoList::default(),
+        let contents = fs::read_to_string(path)?;
+        let list = serde_json::from_str::<TodoList>(&contents)?;
+        Ok(list)
+    }
+
+    /// Load a TodoList from the given file path, with graceful fallback to empty list.
+    /// If the file does not exist or cannot be parsed, returns an empty TodoList and
+    /// logs a warning message.
+    pub fn load_or_empty<P: AsRef<Path>>(path: P) -> Self {
+        let path = path.as_ref();
+        match Self::load(path) {
+            Ok(list) => list,
+            Err(e) => {
+                eprintln!("{}", format!("Warning: Could not load todos from {}: {}", path.display(), e).yellow());
+                eprintln!("{}", "Starting with empty todo list.".dimmed());
+                TodoList::default()
+            }
         }
     }
 

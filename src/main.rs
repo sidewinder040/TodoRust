@@ -38,8 +38,8 @@ fn main() {
 
     let todo_file = choose_todo_file();
 
-    // Load existing todos from disk (if any)
-    let mut list = TodoList::load(&todo_file);
+    // Load existing todos from disk (if any), with graceful fallback to empty list
+    let mut list = TodoList::load_or_empty(&todo_file);
 
     print_banner(&todo_file, list.items.len());
 
@@ -66,41 +66,8 @@ fn main() {
                 print_separator();
             }
             "a" | "add" => {
-                // Gather base item
-                let mut item = create_validated(None);
-
-                // Priority
-                let pri = prompt_input("Priority (low/med/high) [blank for none]");
-                if !pri.is_empty() {
-                    let p = match pri.to_lowercase().as_str() {
-                        "low" => Some(todo::Priority::Low),
-                        "high" => Some(todo::Priority::High),
-                        _ => Some(todo::Priority::Medium),
-                    };
-                    item.priority = p;
-                }
-
-                // Due date (YYYY-MM-DD)
-                let due = prompt_input("Due date (YYYY-MM-DD) [blank for none]");
-                if !due.is_empty() {
-                    if let Ok(nd) = chrono::NaiveDate::parse_from_str(&due, "%Y-%m-%d") {
-                        if let Some(naive) = nd.and_hms_opt(0, 0, 0) {
-                            let dt = chrono::DateTime::from_naive_utc_and_offset(naive, chrono::Utc);
-                            item.due_date = Some(dt);
-                        } else {
-                            println!("{}", "Invalid date/time; ignoring due date".yellow());
-                        }
-                    } else {
-                        println!("{}", "Invalid date format; ignoring due date".yellow());
-                    }
-                }
-
-                // Tags (comma separated)
-                let tags = prompt_input("Tags (comma separated) [blank for none]");
-                if !tags.is_empty() {
-                    item.tags = tags.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
-                }
-
+                // create_validated() handles all field prompts including priority, due_date, and tags
+                let item = create_validated(None);
                 list.add(item);
                 println!("{}", "Added.".green().bold());
             }
@@ -151,6 +118,44 @@ fn main() {
                     }
                 }
             }
+            "s" | "status" => {
+                if list.items.is_empty() {
+                    println!("No todos to modify.");
+                    continue;
+                }
+                println!("Enter index to change status (1-{}):", list.items.len());
+                if let Some(i) = read_index() {
+                    if i == 0 || i > list.items.len() {
+                        println!("{}", "Index out of range".red());
+                    } else {
+                        let idx = i - 1;
+                        let current = &list.items[idx];
+                        println!("{} {} (current status: {})", "Current todo:".yellow(), current.title.bright_white(), format_status(&current.status));
+                        
+                        println!("\nNew status options:");
+                        println!("  1 - Pending");
+                        println!("  2 - InProgress");
+                        println!("  3 - Completed");
+                        
+                        let status_choice = prompt_input("Choose status");
+                        let new_status = match status_choice.trim() {
+                            "1" => Some(todo::Status::Pending),
+                            "2" => Some(todo::Status::InProgress),
+                            "3" => Some(todo::Status::Completed),
+                            _ => {
+                                println!("{}", "Invalid choice".red());
+                                None
+                            }
+                        };
+                        
+                        if let Some(s) = new_status {
+                            list.items[idx].status = s;
+                            list.items[idx].updated_at = Some(chrono::Utc::now());
+                            println!("{}", "Status updated.".green().bold());
+                        }
+                    }
+                }
+            }
             "q" | "quit" => {
                 match list.save(&todo_file) {
                     Ok(()) => println!("{}", format!("Saved {} todos to {}", list.items.len(), todo_file).green()),
@@ -175,12 +180,21 @@ fn print_separator() {
     println!("{}", "-".repeat(50).dimmed());
 }
 
+fn format_status(status: &todo::Status) -> String {
+    match status {
+        todo::Status::Pending => "Pending".yellow().to_string(),
+        todo::Status::InProgress => "InProgress".cyan().to_string(),
+        todo::Status::Completed => "Completed".green().to_string(),
+    }
+}
+
 fn print_commands() {
     println!("{}", "Commands:".bold().underline());
     println!("  {} - {}", format!("{:<8}", "l, list").cyan(), "List todos".dimmed());
     println!("  {} - {}", format!("{:<8}", "a, add").cyan(), "Add a todo".dimmed());
-    println!("  {} - {}", format!("{:<8}", "r, remove").cyan(), "Remove by index".dimmed());
     println!("  {} - {}", format!("{:<8}", "e, edit").cyan(), "Edit by index".dimmed());
+    println!("  {} - {}", format!("{:<8}", "s, status").cyan(), "Change status".dimmed());
+    println!("  {} - {}", format!("{:<8}", "r, remove").cyan(), "Remove by index".dimmed());
     println!("  {} - {}", format!("{:<8}", "q, quit").cyan(), "Save and quit".dimmed());
 }
 
