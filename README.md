@@ -194,6 +194,15 @@ All tests pass with no warnings or errors.
   - `atty` for TTY detection
   - `tempfile` (dev-dependency) for test support
 
+## Migration and atomic save (recent changes)
+
+- Automatic migration: on first run the app will automatically migrate a local `./todos.json` (if present) into the per-user data location when the per-user file does not already exist. This makes the todos available regardless of the directory you run the app from.
+- Atomic save: saves are performed safely by writing to a temporary file in the same directory and then renaming into place. This reduces the chance of corrupt/partial files on crashes. The application removes the temp file after successful rename.
+
+Behavior notes:
+- Migration is automatic when using the default per-user storage path. If you specify a file via CLI or `TODO_FILE` the migration step is skipped.
+- Migration is implemented as a move/rename when possible; when rename fails (cross-device) the code falls back to copy+remove.
+
 ## Next steps / Future improvements
 
 The application is feature-complete for basic todo management. Potential enhancements include:
