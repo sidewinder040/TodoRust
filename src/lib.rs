@@ -249,6 +249,24 @@ impl TodoList {
         }
     }
 
+    /// Remove a stale temporary file created by `save` (the `.filename.tmp` used
+    /// during atomic save) if it exists next to the given target. Returns
+    /// Ok(true) when a temp file was removed, Ok(false) when none was present.
+    pub fn remove_temp_file<P: AsRef<Path>>(target: P) -> Result<bool, TodoListError> {
+        let target = target.as_ref();
+        if let Some(parent) = target.parent() {
+            if let Some(name) = target.file_name() {
+                let tmp_name = format!(".{}.tmp", name.to_string_lossy());
+                let tmp_path = parent.join(tmp_name);
+                if tmp_path.exists() {
+                    fs::remove_file(&tmp_path)?;
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
     /// Add an item to the list.
     pub fn add(&mut self, item: TodoItem) {
         self.items.push(item);

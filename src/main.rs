@@ -62,6 +62,13 @@ fn main() {
 
     let (todo_file, overridden) = choose_todo_file();
 
+    // Cleanup any stale temp file left from a previous interrupted save.
+    match TodoList::remove_temp_file(&todo_file) {
+        Ok(true) => println!("Removed stale temp file for {}", &todo_file),
+        Ok(false) => {}
+        Err(e) => eprintln!("Warning: failed to clean up temp file: {}", e),
+    }
+
     // If the user did not override the storage location, attempt to migrate a
     // local ./todos.json into the per-user location on first run.
     if !overridden {

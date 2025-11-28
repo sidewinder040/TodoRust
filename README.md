@@ -203,6 +203,11 @@ Behavior notes:
 - Migration is automatic when using the default per-user storage path. If you specify a file via CLI or `TODO_FILE` the migration step is skipped.
 - Migration is implemented as a move/rename when possible; when rename fails (cross-device) the code falls back to copy+remove.
 
+Cleanup-on-start:
+
+- On startup the application will remove a stale temp file left behind by a previous interrupted save (the `.todos.json.tmp` file created during atomic save) for the chosen target path. This keeps the per-user data directory tidy and avoids showing or using old temp files.
+- If you prefer to inspect or retain the temp files for debugging, let me know and I can instead print their locations instead of removing them.
+
 ## Next steps / Future improvements
 
 The application is feature-complete for basic todo management. Potential enhancements include:
