@@ -190,9 +190,63 @@ impl TodoList {
     /// or serialization failures.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
         let path = path.as_ref();
+        // Ensure parent dir exists
+        if let Some(dir) = path.parent() {
+            fs::create_dir_all(dir)?;
+        }
+
         let json = serde_json::to_string_pretty(self)?;
-        fs::write(path, json)?;
+
+        // Write to a temporary file in the same directory then rename for atomic save
+        let tmp_name = match path.file_name() {
+            Some(name) => format!(".{}.tmp", name.to_string_lossy()),
+            None => ".todos.json.tmp".to_string(),
+        };
+        let tmp_path = path.with_file_name(tmp_name);
+
+        fs::write(&tmp_path, &json)?;
+
+        // On Windows, rename to an existing path may fail. Remove existing file first.
+        if path.exists() {
+            fs::remove_file(path)?;
+        }
+        fs::rename(&tmp_path, path)?;
         Ok(())
+    }
+
+    /// If a local `todos.json` exists in the current working directory and the
+    /// `target` path does not exist, move (rename) the local file into the
+    /// target location. Returns Ok(true) if migration occurred, Ok(false) if
+    /// nothing to do, or Err on IO/parse failures.
+    pub fn migrate_local_if_present<P: AsRef<Path>>(target: P) -> Result<bool, TodoListError> {
+        let target = target.as_ref();
+        // Do nothing if target already present
+        if target.exists() {
+            return Ok(false);
+        }
+
+        let local = Path::new("todos.json");
+        if !local.exists() {
+            return Ok(false);
+        }
+
+        // Ensure parent dir exists for target
+        if let Some(dir) = target.parent() {
+            fs::create_dir_all(dir)?;
+        }
+
+        // Try to move the local file into target. If rename fails (cross-device),
+        // fall back to copy+remove.
+        match fs::rename(&local, &target) {
+            Ok(()) => Ok(true),
+            Err(_) => {
+                // fallback: copy then remove
+                fs::copy(&local, &target)?;
+                fs::remove_file(&local)?;
+                // still treat as migrated
+                Ok(true)
+            }
+        }
     }
 
     /// Add an item to the list.

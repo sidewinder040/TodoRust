@@ -4,18 +4,42 @@ use std::env;
 use std::io::{self, Write};
 use owo_colors::OwoColorize;
 use atty::Stream;
+use directories::ProjectDirs; // added
+use std::path::PathBuf;       // added
 
-fn choose_todo_file() -> String {
-    // Priority: first non-flag CLI arg, then TODO_FILE env var, then default
+/// Choose the todo file to use and whether it was explicitly provided by the
+/// user. Returns (path, overridden) where `overridden` is true when the path
+/// came from a CLI argument or TODO_FILE env var.
+fn choose_todo_file() -> (String, bool) {
+    // Priority: first non-flag CLI arg
     for a in env::args().skip(1) {
         if !a.starts_with('-') {
-            return a;
+            return (a, true);
         }
     }
+    // Then env var
     if let Ok(envp) = env::var("TODO_FILE") {
-        return envp;
+        return (envp, true);
     }
-    "todos.json".to_string()
+    // fallback to platform-specific per-user file
+    (default_user_todo_file().to_string_lossy().into_owned(), false)
+}
+
+// New helper: returns per-user data-file path like:
+//  - Linux:  ~/.local/share/TodoRust/todos.json
+//  - macOS:  ~/Library/Application Support/TodoRust/todos.json
+//  - Windows: %APPDATA%\TodoRust\todos.json
+fn default_user_todo_file() -> PathBuf {
+    if let Some(proj) = ProjectDirs::from("com", "example", "TodoRust") {
+        let dir = proj.data_local_dir(); // platform-appropriate user data directory
+        if let Err(_) = std::fs::create_dir_all(dir) {
+            // fall back to current dir file on failure
+            return PathBuf::from("todos.json");
+        }
+        return dir.join("todos.json");
+    }
+    // final fallback
+    PathBuf::from("todos.json")
 }
 
 fn main() {
@@ -36,7 +60,17 @@ fn main() {
         env::set_var("NO_COLOR", "1");
     }
 
-    let todo_file = choose_todo_file();
+    let (todo_file, overridden) = choose_todo_file();
+
+    // If the user did not override the storage location, attempt to migrate a
+    // local ./todos.json into the per-user location on first run.
+    if !overridden {
+        match TodoList::migrate_local_if_present(&todo_file) {
+            Ok(true) => println!("Migrated local ./todos.json into {}", &todo_file),
+            Ok(false) => {}
+            Err(e) => eprintln!("Migration warning: {}", e),
+        }
+    }
 
     // Load existing todos from disk (if any), with graceful fallback to empty list
     let mut list = TodoList::load_or_empty(&todo_file);
